@@ -165,12 +165,7 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
       break;
     }
     const char *msg = doc["msg"];
-    externalSensor = int(doc["sensor"]);
-
-    Serial.println(externalSensor);
-
-    Serial.print("msg: ");
-    Serial.println(msg);
+    externalSensor = int(doc["msg"]);
   }
   break;
   default:
