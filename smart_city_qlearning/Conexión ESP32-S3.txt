@@ -1,0 +1,62 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+const char* ssid = "TU_SSID";
+const char* password = "TU_PASSWORD";
+const char* serverName = "http://192.168.1.100:5000/decidir"; // IP del PC con Flask
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
+  }
+  Serial.println("Conectado a WiFi");
+}
+
+void loop() {
+  float co2 = analogRead(34) / 4095.0;  // ejemplo
+  float vis = analogRead(35) / 4095.0;
+  int veh_c1 = digitalRead(32);
+  int veh_c2 = digitalRead(33);
+
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/json");
+
+    // Construye JSON
+    StaticJsonDocument<200> doc;
+    doc["co2"] = co2;
+    doc["vis"] = vis;
+    doc["veh_c1"] = veh_c1;
+    doc["veh_c2"] = veh_c2;
+
+    String requestBody;
+    serializeJson(doc, requestBody);
+
+    int httpResponseCode = http.POST(requestBody);
+
+    if (httpResponseCode == 200) {
+      String response = http.getString();
+      StaticJsonDocument<100> resDoc;
+      deserializeJson(resDoc, response);
+      int action = resDoc["action"];
+
+      if (action == 0) {
+        Serial.println("Cambiar prioridad de carril");
+        // activa luces, relés, etc.
+      } else {
+        Serial.println("Mantener prioridad actual");
+      }
+    } else {
+      Serial.print("Error HTTP: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  }
+
+  delay(5000);  // cada 5 segundos
+}
