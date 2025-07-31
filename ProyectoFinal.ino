@@ -3,15 +3,13 @@
 #include <ArduinoJson.h>
 
 // Pinout
-#define LR1 7
-#define LA1 15
-#define LV1 16
-#define LED_PIN 5
+#define LR1 5
+#define LY1 4
+#define LG1 6
 
-#define RED 0
-#define YELLOW2GREEN 1
-#define GREEN 2
-#define YELLOW2RED 3
+#define LR2 7
+#define LY2 15
+#define LG2 16
 
 #define SENSOR_PIN 12
 
@@ -24,18 +22,21 @@ int externalSensor = -1;
 // Websocket value reference and interval to send data through websocket
 unsigned long lastSentInterval = 0;
 const unsigned long interval = 2000;
-
 WebSocketsClient webSocket;
 
-bool R = 0;
-bool A = 0;
-bool V = 0;
+bool R1 = 0;
+bool Y1 = 0;
+bool G1 = 0;
+
+bool R2 = 0;
+bool Y2 = 0;
+bool G2 = 0;
 int state = 0;
 
 long unsigned tini, tactual, tdelta;
 bool badVisibility;
 
-void meassure()
+void measure()
 {
   int sensorValue = analogRead(SENSOR_PIN);
   tactual = millis();
@@ -51,74 +52,98 @@ bool getBadVisibility()
   return (localSensor < 600);
 }
 
-void controlar()
+void control()
 {
   switch (state)
   {
-  case RED:
+  // RED
+  case 0:
+    R1 = 0;
+    Y1 = 0;
+    G1 = 1;
+
+    R2 = 1;
+    Y2 = 0;
+    G2 = 0;
     if (badVisibility)
     {
-      state = GREEN;
+      state = 2;
       tini = millis();
-      break;
+      Serial.println("Sensor covered");
     }
-    R = 1;
-    A = 0;
-    V = 0;
-    if (tdelta >= 3000)
+    else if (tdelta >= 2000)
     {
-      state = YELLOW2GREEN;
+      state = 1;
       tini = millis();
+      Serial.println("Moving to yellow");
     }
     break;
 
-  case YELLOW2GREEN:
+  // YELLOW
+  case 1:
+    R1 = 0;
+    Y1 = 1;
+    G1 = 0;
+
+    R2 = 0;
+    Y2 = 1;
+    G2 = 0;
     if (badVisibility)
     {
-      state = GREEN;
+      state = 2;
       tini = millis();
-      break;
+      Serial.println("Sensor covered");
     }
-    R = 0;
-    A = 1;
-    V = 0;
-    if (tdelta >= 2000)
+    else if (tdelta >= 1000)
     {
-      state = GREEN;
+      state = 2;
       tini = millis();
+      Serial.println("Moving to 2");
     }
     break;
 
-  case GREEN:
-    R = 0;
-    A = 0;
-    V = 1;
+  // GREEN
+  case 2:
+    R1 = 1;
+    Y1 = 0;
+    G1 = 0;
+
+    R2 = 0;
+    Y2 = 0;
+    G2 = 1;
     if (badVisibility)
     {
       tini = millis();
-      break;
+      Serial.println("Sensor covered");
     }
-    if (tdelta >= 6000 && !badVisibility)
+    else if (tdelta >= 2000 && !badVisibility)
     {
-      state = YELLOW2RED;
+      state = 3;
       tini = millis();
+      Serial.println("Moving to yellow");
     }
     break;
 
-  case YELLOW2RED:
+  // YELLOW
+  case 3:
+    R1 = 0;
+    Y1 = 1;
+    G1 = 0;
+
+    R2 = 0;
+    Y2 = 1;
+    G2 = 0;
     if (badVisibility)
     {
-      state = GREEN;
+      state = 2;
       tini = millis();
-      break;
+      Serial.println("Sensor covered");
     }
-    R = 0;
-    A = 1;
-    V = 0;
-    if (tdelta >= 2000)
+    else if (tdelta >= 1000)
     {
-      state = RED;
+      state = 0;
       tini = millis();
+      Serial.println("Moving to 0");
     }
     break;
 
@@ -127,11 +152,15 @@ void controlar()
   }
 }
 
-void actuar()
+void act()
 {
-  digitalWrite(LR1, R);
-  digitalWrite(LA1, A);
-  digitalWrite(LV1, V);
+  digitalWrite(LR1, R1);
+  digitalWrite(LY1, Y1);
+  digitalWrite(LG1, G1);
+
+  digitalWrite(LR2, R2);
+  digitalWrite(LY2, Y2);
+  digitalWrite(LG2, G2);
 }
 
 // Handle incoming WebSocket messages
@@ -140,10 +169,10 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
   switch (type)
   {
   case WStype_CONNECTED:
-    Serial.println("Connected to WebSocket serGREEN");
+    Serial.println("Connected to WebSocket ser2");
     break;
   case WStype_DISCONNECTED:
-    Serial.println("Disconnected from WebSocket serGREEN");
+    Serial.println("Disconnected from WebSocket ser2");
     break;
   case WStype_TEXT:
   {
@@ -194,12 +223,15 @@ void sendSignalWebsocket()
 void setup()
 {
   Serial.begin(115200);
-  pinMode(LED_PIN, OUTPUT);
   pinMode(SENSOR_PIN, INPUT);
 
   pinMode(LR1, OUTPUT);
-  pinMode(LA1, OUTPUT);
-  pinMode(LV1, OUTPUT);
+  pinMode(LY1, OUTPUT);
+  pinMode(LG1, OUTPUT);
+
+  pinMode(LR2, OUTPUT);
+  pinMode(LY2, OUTPUT);
+  pinMode(LG2, OUTPUT);
 
   // Wifi connection
   WiFi.begin(ssid, password);
@@ -216,13 +248,13 @@ void setup()
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
 
-  actuar();
+  act();
 }
 
 void loop()
 {
   sendSignalWebsocket();
-  meassure();
-  controlar();
-  actuar();
+  measure();
+  control();
+  act();
 }
