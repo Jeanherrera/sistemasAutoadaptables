@@ -1,8 +1,34 @@
+// Entradas
+// 2 Sensores de luz (Fotoceldas que se activan cuando superan el umbral de 600)
+// 3 Sensores infrarojos a cada lado (6 Sensores)
+// 1 Sensor de CO2
+
+// Salidas
+// 2 Semaforos 
+// 1 Pantalla
+
+// Modo normal: Parpadeo Amarillo
+// Si un carro llega por un carril: El carril se pone en verde y el otro se pone en rojo
+// Si dos carros llegan, el primer carro en llegar tiene prioridad y funciona normal hasta que no se detecten mas carros
+
+// Si hay carros en un carril y se oscurece, se pone en verde y el otro en rojo hasta que no hayan carros y cambia a rojo
+// Si ambos se oscurecen, ambos se ponen en parpadeo amarillo
+// Si está de noche y llega un carro, se le da prioridad y el otro se pone en rojo
+
+// Si el sensor de CO2 está alto y hay carros el carril se pone en verde y el otro en rojo hasta que los carros 
+
+
+// Estados
+// - Parpadeo Amarillo:   (S1 & S2 == 0  &&  veh_c1 === 0 & veh_c2 == 0)
+// - Parpadeo Normal:     (S1 && S2 && !CO2 && !B1 && B2)
+// - Prioridad carril  1  (1 en verde --> 2 en rojo): (CNY1 && !S1) || B2
+// - Prioridad carrilo 2  (2 en verde --> 1 en rojo): (CNY2 && (!S2 || CO2)) || B1
+
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-//#include <WiFi.h>
-//#include <WebSocketsClient_Generic.h>
-//#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <WebSocketsClient_Generic.h>
+#include <ArduinoJson.h>
 
 // LCD I2C
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -28,7 +54,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define CNY3 40
 
 // Sensores ambientales
-#define SENSOR_PIN        12  // Visibilidad
+#define SENSOR_PIN_S1     12  // Visibilidad
+#define SENSOR_PIN_S2     13  // Visibilidad
 #define CO2_SENSOR_PIN    14  // CO₂
 
 // Estados del semáforo
@@ -37,38 +64,44 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define GREEN            2
 #define GREEN_TO_YELLOW  3
 
-const char* ssid = "Usuario";
-const char* password = "Clave";
+// Variables que cambian:
+int YELLOW_LED_PIN_1_STATE = LOW;
+int YELLOW_LED_PIN_2_STATE = LOW;
 
-//WebSocketsClient webSocket;
+const char* ssid = "AirportAgent01";
+const char* password = "15427605";
 
-unsigned long lastSent = 0;
-const unsigned long interval = 5000;
+WebSocketsClient webSocket;
+
+unsigned long previousMillis = 0;
+const unsigned long interval = 100;
 
 int state = 0;
-bool bad = false;
+bool vlS1 = false, vlS2 = false;
 bool co2High = false;
-int sensor_other_city = 0, sensorValue = 0, local_visibility = 0;
+int sensor_other_city = 0, sensorValueS1 = 0, sensorValueS2 = 0, sensorValueCO2 = 0, veh_c1 = 0, veh_c2 = 0;
 
 
 unsigned long tini, tactual, tdelta;
-bool R = false, A = false, V = false;
+bool R1 = false, Y1 = false, V1 = false;
+bool R2 = false, Y2 = false, V2 = false;
 
 void setup() {
   Serial.begin(115200);
   config_display();
   pinModes();
-  //connection();  // WiFi y WebSocket
-  allOff();
+  connection();  // WiFi y WebSocket
+  //allOff();
 }
 
-void pinModes(){
+void pinModes() {
 
   // Sensor CO2
   pinMode(CO2_SENSOR_PIN, INPUT);
-  
+
   // Sensor visibilidad
-  pinMode(SENSOR_PIN, INPUT);
+  pinMode(SENSOR_PIN_S1, INPUT);
+  pinMode(SENSOR_PIN_S2, INPUT);
 
   // Sensores carril #1
   pinMode(CNY1, INPUT);
@@ -91,168 +124,156 @@ void pinModes(){
   pinMode(GREEN_LED_PIN_2, OUTPUT);
 }
 
-void config_display(){
+void config_display() {
   lcd.init();            // Inicializa la pantalla
   lcd.backlight();       // Enciende luz de fondo
   lcd.setCursor(0, 0);
-  lcd.print("Smart City EAFIT");
+  lcd.print("Smart City Capibaras");
+  lcd.clear();
 }
 
-void read_CO2_sensor(){
-  sensorValue = analogRead(CO2_SENSOR_PIN);
-  co2High = (sensorValue > 700);
+void read_CO2_sensor() {
+  sensorValueCO2 = analogRead(CO2_SENSOR_PIN);
+  co2High = (sensorValueCO2 > 700);
 }
 
-void measure(){
-  int sensorValue = analogRead(SENSOR_PIN);
-  tactual = millis();
-  tdelta = tactual - tini;
-  bad = read_visibility();
+void read_sensor_S1() {
+  sensorValueS1 = analogRead(SENSOR_PIN_S1);
+  vlS1 = (sensorValueS1 < 600);
 }
 
-bool read_visibility() {
-  local_visibility = analogRead(SENSOR_PIN);
+void read_sensor_S2() {
+  sensorValueS2 = analogRead(SENSOR_PIN_S2);
+  vlS2 = read_visibility(sensorValueS2);
+}
+
+bool read_visibility(int sensorValue) {
 
   if (sensor_other_city != 0) {
-    return (local_visibility < 600) || (sensor_other_city < 600);
+    return (sensorValue < 600) || (sensor_other_city < 600);
   }
 
-  return (local_visibility < 600);
+  return (sensorValue < 600);
 }
 
-void show_values_display(){
-  lcd.setCursor(0, 1);
+void show_values_display() {
+  lcd.setCursor(0, 0);
   lcd.print("CO2:");
-  lcd.print(sensorValue);
-  lcd.print(" L:");
-  lcd.print(local_visibility);
-  lcd.print(" O:");
+  lcd.print(sensorValueCO2);
+  lcd.setCursor(0, 1);
+  lcd.print("V2:");
+  lcd.print(sensorValueS2);
+  lcd.print(" VR:");
   lcd.print(sensor_other_city);
 }
 
 void loop() {
-  
- // webSocket.loop();          // Procesar WebSocket
-  //sendSignalWebsocket();     // Enviar datos cada intervalo
 
-  measure();                 // Leer visibilidad
+  webSocket.loop();       // Procesar WebSocket
+  sendSignalWebsocket();   // Enviar datos cada intervalo
+
   read_CO2_sensor();         // Mostrar CO₂ en LCD
+  read_sensor_S1();           // Leer valor de los sensores semaforo 1
+  read_sensor_S2();           // Leer valor de los sensores semaforo 2
 
   // Mostras los valores de los sensores
   show_values_display();
 
-  bool VehicleLine1 = lane_in_1();
-  bool VehicleLine2 = lane_in_2();
+  // Modo normal
+  checkState();
+  updateLights();
+
+  // bool VehicleLine1 = lane_in_1();
+  //bool VehicleLine2 = lane_in_2();
 
   /*if (co2High || bad) {
     priorityLine2();
-  }
-  else*/ if (VehicleLine1) {
+    }
+    else if (VehicleLine1) {
     priorityLine2();
-  }
-  else if (VehicleLine2) {
+    }
+    else if (VehicleLine2) {
     priorityLine1();
-  }
-  else {
+    }
+    else {
     NoVehicleMode();
-  }
+    }*/
 }
 
 void priorityLine1() {
   allOff();
   lcd.setCursor(0, 2);
-  lcd.print("Paso: Carril #1   ");
-  digitalWrite(RED_LED_PIN_2, HIGH);
-  digitalWrite(GREEN_LED_PIN_1, HIGH);
-  delay(5000);
+  lcd.print("Paso: Carril #1 #V:");
+  lcd.print(veh_c1);
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    digitalWrite(RED_LED_PIN_2, HIGH);
+    digitalWrite(GREEN_LED_PIN_1, HIGH);
+  }
 }
 
 void priorityLine2() {
   allOff();
   lcd.setCursor(0, 2);
-  lcd.print("Paso: Carril #2   ");
-  digitalWrite(RED_LED_PIN_1, HIGH);
-  digitalWrite(GREEN_LED_PIN_2, HIGH);
-  delay(5000);
+  lcd.print("Paso: Carril #2 #V:");
+  lcd.print(veh_c2);
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+    digitalWrite(RED_LED_PIN_1, HIGH);
+    digitalWrite(GREEN_LED_PIN_2, HIGH);
+  }
 }
 
-void NoVehicleMode(){
+void NoVehicleMode() {
   allOff();
   lcd.setCursor(0, 2);
   lcd.print("Modo sin vehiculos ");
   yellow_flashing_both();;
 }
 
-void check(){
-    switch (state) {
+void checkState() {
+  tactual = millis();
+  unsigned long tdelta = tactual - tini;
+
+  // Si hay una condición "mala", y el estado lo permite, transicionar a GREEN
+  if (vlS1 && (state == RED || state == RED_TO_YELLOW || state == GREEN_TO_YELLOW)) {
+    state = GREEN;
+    tini = millis();
+    return;
+  }
+
+  switch (state) {
     case RED:
-      if (bad) {
-        state = GREEN;
-        tini = millis();
-        break;
-      }
-
-      R = 1;
-      A = 0;
-      V = 0;
-
       if (tdelta >= 3000) {
-        state = RED_TO_YELLOW;
-        Serial.println("Estado 1: Rojo a Amarillo");
-        tini = millis();
+        changeState(RED_TO_YELLOW, "Estado 1: Rojo a Amarillo");
       }
       break;
 
     case RED_TO_YELLOW:
-      if (bad) {
-        state = GREEN;
-        tini = millis();
-        break;
-      }
-
-      R = 0;
-      A = 1;
-      V = 0;
-
       if (tdelta >= 2000) {
-        state = GREEN;
-        Serial.println("Estado 2: Verde");
-        tini = millis();
+        changeState(GREEN, "Estado 2: Verde");
       }
       break;
 
     case GREEN:
-      R = 0;
-      A = 0;
-      V = 1;
-
-      if (bad) {
+      if (vlS1) {
         tini = millis();
         break;
       }
-
-      if (tdelta >= 6000) {
-        state = GREEN_TO_YELLOW  ;
-        Serial.println("Estado 3: Verde a Amarillo");
-        tini = millis();
+      if (tdelta >= 6000 && !vlS1) {
+        changeState(GREEN_TO_YELLOW, "Estado 3: Verde a Amarillo");
       }
       break;
 
     case GREEN_TO_YELLOW:
-      if (bad) {
-        state = GREEN;
-        tini = millis();
-        break;
-      }
-
-      R = 0;
-      A = 1;
-      V = 0;
-
       if (tdelta >= 2000) {
-        state = RED;
-        Serial.println("Estado 0: Rojo");
-        tini = millis();
+        changeState(RED, "Estado 0: Rojo");
       }
       break;
 
@@ -261,28 +282,62 @@ void check(){
   }
 }
 
-void act_line_2() {
-  digitalWrite(RED_LED_PIN_2, R);
-  digitalWrite(YELLOW_LED_PIN_1, A);
-  digitalWrite(GREEN_LED_PIN_1, V);
+void changeState(int newState, const char* message) {
+  state = newState;
+  tini = millis();
+  Serial.println(message);
 }
 
-bool lane_in_1(){
-  return digitalRead(CNY4) == LOW || digitalRead(CNY5) == LOW  || digitalRead(CNY6) == LOW ;
+void updateLights() {
+  switch (state) {
+    case RED:
+      R1 = 0; Y1 = 0; V1 = 1; // Semáforo 1: Verde
+      R2 = 1; Y2 = 0; V2 = 0; // Semáforo 2: Rojo
+      break;
+
+    case RED_TO_YELLOW:
+      R1 = 0; Y1 = 1; V1 = 0;  // Semáforo 1: Amarillo
+      R2 = 0; Y2 = 1; V2 = 0; // Semáforo 2: Amarillo
+      break;
+
+    case GREEN:
+      R1 = 1; Y1 = 0; V1 = 0; // Semáforo 1: Rojo
+      R2 = 0; Y2 = 0; V2 = 1; // Semáforo 2: Verde
+      break;
+
+    case GREEN_TO_YELLOW:
+      R1 = 0; Y1 = 1; V1 = 0; // Semáforo 1: Amarillo
+      R2 = 0; Y2 = 1; V2 = 0; // Semáforo 2: Amarillo
+      break;
+  }
+
+  // Actualiza pines físicos
+  digitalWrite(RED_LED_PIN_1, R1);
+  digitalWrite(YELLOW_LED_PIN_1, Y1);
+  digitalWrite(GREEN_LED_PIN_1, V1);
+
+  digitalWrite(RED_LED_PIN_2, R2);
+  digitalWrite(YELLOW_LED_PIN_2, Y2);
+  digitalWrite(GREEN_LED_PIN_2, V2);
+}
+
+bool lane_in_1() {
+  veh_c1 = 0;
+  if (digitalRead(CNY4) == LOW) veh_c1++;
+  if (digitalRead(CNY5) == LOW) veh_c1++;
+  if (digitalRead(CNY6) == LOW) veh_c1++;
+  return veh_c1 > 0;
 }
 
 bool lane_in_2() {
-  return digitalRead(CNY1) == LOW || digitalRead(CNY2) == LOW || digitalRead(CNY3) == LOW;
+  veh_c2 = 0;
+  if (digitalRead(CNY1) == LOW) veh_c2++;
+  if (digitalRead(CNY2) == LOW) veh_c2++;
+  if (digitalRead(CNY3) == LOW) veh_c2++;
+  return veh_c2 > 0;
 }
 
-void yellow_flashing_line_2(){
-  digitalWrite(YELLOW_LED_PIN_1, HIGH);
-  delay(500);
-  digitalWrite(YELLOW_LED_PIN_1, LOW);
-  delay(500);
-}
-
-void allOff(){
+void allOff() {
 
   // Semaforo 1
   digitalWrite(RED_LED_PIN_1, LOW);
@@ -296,15 +351,32 @@ void allOff(){
 }
 
 void yellow_flashing_both() {
-  digitalWrite(YELLOW_LED_PIN_1, HIGH);
-  digitalWrite(YELLOW_LED_PIN_2, HIGH);
-  delay(500);
-  digitalWrite(YELLOW_LED_PIN_1, LOW);
-  digitalWrite(YELLOW_LED_PIN_2, LOW);
-  delay(500);
+
+  unsigned long currentMillis = millis();
+
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+
+    // if the LED is off turn it on and vice-versa:
+    if (YELLOW_LED_PIN_1_STATE == LOW) {
+      YELLOW_LED_PIN_1_STATE = HIGH;
+    } else {
+      YELLOW_LED_PIN_1_STATE = LOW;
+    }
+
+    if (YELLOW_LED_PIN_2_STATE == LOW) {
+      YELLOW_LED_PIN_2_STATE = HIGH;
+    } else {
+      YELLOW_LED_PIN_2_STATE = LOW;
+    }
+
+    digitalWrite(YELLOW_LED_PIN_1, YELLOW_LED_PIN_1_STATE);
+    digitalWrite(YELLOW_LED_PIN_2, YELLOW_LED_PIN_2_STATE);
+  }
 }
 
-/*void connection(){
+void connection(){
   // Wifi connection
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
@@ -318,10 +390,10 @@ void yellow_flashing_both() {
   webSocket.beginSSL("ws.davinsony.com", 443, "/city_sebas");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
-}*/
+  }
 
 // Handle incoming WebSocket messages
-/*void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
+void webSocketEvent(WStype_t type, uint8_t* payload, size_t length) {
   switch (type) {
     case WStype_CONNECTED:
       Serial.println("Connected to WebSocket server");
@@ -352,15 +424,15 @@ void yellow_flashing_both() {
     default:
       break;
   }
-}*/
+  }
 
-/*void sendSignalWebsocket() {
+void sendSignalWebsocket() {
   webSocket.loop();
 
   unsigned long now = millis();
-  if (now - lastSent > 2000 && webSocket.isConnected()) {
-    lastSent = now;
-    int sensorValue = analogRead(SENSOR_PIN);
+  if (now - previousMillis > 2000 && webSocket.isConnected()) {
+    previousMillis = now;
+    int sensorValue = analogRead(SENSOR_PIN_S2);
 
     // Optional: use JSON format
     StaticJsonDocument<100> doc;
@@ -371,5 +443,5 @@ void yellow_flashing_both() {
     serializeJson(doc, json);
 
     webSocket.sendTXT(json);  // send sensor reading
+    }
   }
-}*/
