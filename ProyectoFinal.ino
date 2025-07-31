@@ -52,98 +52,76 @@ bool getBadVisibility()
   return (localSensor < 600);
 }
 
+void setLights(bool r1, bool y1, bool g1, bool r2, bool y2, bool g2)
+{
+  R1 = r1;
+  Y1 = y1;
+  G1 = g1;
+  R2 = r2;
+  Y2 = y2;
+  G2 = g2;
+}
+
 void control()
 {
   switch (state)
   {
   // RED
   case 0:
-    R1 = 0;
-    Y1 = 0;
-    G1 = 1;
-
-    R2 = 1;
-    Y2 = 0;
-    G2 = 0;
+    setLights(0, 0, 1, 1, 0, 0);
     if (badVisibility)
     {
       state = 2;
       tini = millis();
-      Serial.println("Sensor covered");
     }
     else if (tdelta >= 2000)
     {
       state = 1;
       tini = millis();
-      Serial.println("Moving to yellow");
     }
     break;
 
   // YELLOW
   case 1:
-    R1 = 0;
-    Y1 = 1;
-    G1 = 0;
-
-    R2 = 0;
-    Y2 = 1;
-    G2 = 0;
+    setLights(0, 1, 0, 0, 1, 0);
     if (badVisibility)
     {
       state = 2;
       tini = millis();
-      Serial.println("Sensor covered");
     }
     else if (tdelta >= 1000)
     {
       state = 2;
       tini = millis();
-      Serial.println("Moving to 2");
     }
     break;
 
   // GREEN
   case 2:
-    R1 = 1;
-    Y1 = 0;
-    G1 = 0;
-
-    R2 = 0;
-    Y2 = 0;
-    G2 = 1;
+    setLights(1, 0, 0, 0, 0, 1);
     if (badVisibility)
     {
       tini = millis();
-      Serial.println("Sensor covered");
     }
     else if (tdelta >= 2000 && !badVisibility)
     {
       state = 3;
       tini = millis();
-      Serial.println("Moving to yellow");
     }
     break;
 
   // YELLOW
   case 3:
-    R1 = 0;
-    Y1 = 1;
-    G1 = 0;
-
-    R2 = 0;
-    Y2 = 1;
-    G2 = 0;
+    setLights(0, 1, 0, 0, 1, 0);
     if (badVisibility)
     {
       state = 2;
       tini = millis();
-      Serial.println("Sensor covered");
     }
     else if (tdelta >= 1000)
     {
       state = 0;
       tini = millis();
-      Serial.println("Moving to 0");
     }
     break;
 
