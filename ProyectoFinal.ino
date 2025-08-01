@@ -12,21 +12,43 @@
 #define LY2 15
 #define LG2 16
 
-#define SENSOR_PIN 12
+// Rail 1 vehicles Sensors
+#define CNY1 42
+#define CNY2 41
+#define CNY3 40
+// Rail 2 vehicles Sensors
+#define CNY4 39
+#define CNY5 38
+#define CNY6 37
+// Vehicle count
+int VC1, VC2;
+
+// Buttons
+#define B1 1
+#define B2 2
+bool button1, button2;
+
+// Light Dependent Resistors (LDRs)
+#define LDR1 13
+#define LDR2 12
+#define UMBRAL_LDR 600
+bool lowLightR1, lowLightR2;
+
+// CO₂ Sensor
+#define CO2_SENSOR_PIN 14
+#define UMBRAL_CO2 1000
+bool highCO2;
 
 const char *ssid = "AirportAgent01";
 const char *password = "15427605";
 
-// LCD I2C
-LiquidCrystal_I2C lcd(0x27, 16, 2);
-
-// Initial Value of External sensor
-int externalSensor = -1;
-
 // Websocket value reference and interval to send data through websocket
+WebSocketsClient webSocket;
 unsigned long lastSentInterval = 0;
 const unsigned long interval = 2000;
-WebSocketsClient webSocket;
+
+// LCD I2C
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 
 bool R1 = 0;
 bool Y1 = 0;
@@ -38,30 +60,30 @@ bool G2 = 0;
 int state = 0;
 
 long unsigned tini, tactual, tdelta;
-bool badVisibility;
 
 void config_display()
 {
   lcd.init();
   lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Smart City Capibaras");
 }
 
 void measure()
 {
-  int sensorValue = analogRead(SENSOR_PIN);
+  lowLightR1 = analogRead(LDR1) < UMBRAL_LDR;
+  lowLightR2 = analogRead(LDR2) < UMBRAL_LDR;
+
+  highCO2 = analogRead(CO2_SENSOR_PIN) > UMBRAL_CO2;
+
+  button1 = digitalRead(B1);
+  button2 = digitalRead(B2);
+
+  VC1 = !digitalRead(CNY1) + !digitalRead(CNY2) + !digitalRead(CNY3);
+  VC2 = !digitalRead(CNY4) + !digitalRead(CNY5) + !digitalRead(CNY6);
+
   tactual = millis();
   tdelta = tactual - tini;
-  badVisibility = getBadVisibility();
-}
 
-bool getBadVisibility()
-{
-  int localSensor = analogRead(SENSOR_PIN);
-  if (externalSensor != -1)
-    return (localSensor < 600) || (externalSensor < 600);
-  return (localSensor < 600);
+  printSensors();
 }
 
 void setTrafficLight1(bool r1, bool y1, bool g1)
@@ -86,12 +108,12 @@ void control()
   case 0:
     setTrafficLight1(0, 0, 1);
     setTrafficLight2(1, 0, 0);
-    if (badVisibility)
+    if (lowLightR1)
     {
       state = 2;
       tini = millis();
     }
-    else if (tdelta >= 2000)
+    else if (tdelta >= 1000)
     {
       state = 1;
       tini = millis();
@@ -102,12 +124,12 @@ void control()
   case 1:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (badVisibility)
+    if (lowLightR1)
     {
       state = 2;
       tini = millis();
     }
-    else if (tdelta >= 1000)
+    else if (tdelta >= 500)
     {
       state = 2;
       tini = millis();
@@ -118,11 +140,11 @@ void control()
   case 2:
     setTrafficLight1(1, 0, 0);
     setTrafficLight2(0, 0, 1);
-    if (badVisibility)
+    if (lowLightR1)
     {
       tini = millis();
     }
-    else if (tdelta >= 2000 && !badVisibility)
+    else if (tdelta >= 1000 && !lowLightR1)
     {
       state = 3;
       tini = millis();
@@ -133,17 +155,33 @@ void control()
   case 3:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (badVisibility)
+    if (lowLightR1)
     {
       state = 2;
       tini = millis();
     }
-    else if (tdelta >= 1000)
+    else if (tdelta >= 500)
     {
       state = 0;
       tini = millis();
     }
     break;
+
+    // YELLOW FLASHING
+    // case 4:
+    //   setTrafficLight1(0, 1, 0);
+    //   setTrafficLight2(0, 1, 0);
+    //   if (lowLightR1)
+    //   {
+    //     state = 2;
+    //     tini = millis();
+    //   }
+    //   else if (tdelta >= 1000)
+    //   {
+    //     state = 0;
+    //     tini = millis();
+    //   }
+    //   break;
 
   default:
     break;
@@ -161,62 +199,74 @@ void act()
   digitalWrite(LG2, G2);
 }
 
-// Handle incoming WebSocket messages
-void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
-{
-  switch (type)
-  {
-  case WStype_CONNECTED:
-    Serial.println("Connected to WebSocket ser2");
-    break;
-  case WStype_DISCONNECTED:
-    Serial.println("Disconnected from WebSocket ser2");
-    break;
-  case WStype_TEXT:
-  {
-    Serial.printf("Received: %s\n", payload);
-    // Parse the incoming JSON message
-    StaticJsonDocument<200> doc;
-    DeserializationError error = deserializeJson(doc, payload);
-    if (error)
-    {
-      Serial.print("JSON parsing failed: ");
-      Serial.println(error.c_str());
-      break;
-    }
-    const char *msg = doc["msg"];
-    externalSensor = int(doc["msg"]);
-  }
-  break;
-  default:
-    break;
-  }
-}
+// // Handle incoming WebSocket messages
+// void webSocketEvent(WStype_t type, uint8_t *payload, size_t length)
+// {
+//   switch (type)
+//   {
+//   case WStype_CONNECTED:
+//     Serial.println("Connected to WebSocket ser2");
+//     break;
+//   case WStype_DISCONNECTED:
+//     Serial.println("Disconnected from WebSocket ser2");
+//     break;
+//   case WStype_TEXT:
+//   {
+//     Serial.printf("Received: %s\n", payload);
+//     // Parse the incoming JSON message
+//     StaticJsonDocument<200> doc;
+//     DeserializationError error = deserializeJson(doc, payload);
+//     if (error)
+//     {
+//       Serial.print("JSON parsing failed: ");
+//       Serial.println(error.c_str());
+//       break;
+//     }
+//     const char *msg = doc["msg"];
+//     externalSensor = int(doc["msg"]);
+//   }
+//   break;
+//   default:
+//     break;
+//   }
+// }
 
-void sendSignalWebsocket()
-{
-  webSocket.loop();
-  unsigned long now = millis();
-  if (now - lastSentInterval > interval && webSocket.isConnected())
-  {
-    lastSentInterval = now;
-    int sensorValue = analogRead(SENSOR_PIN);
+// void sendSignalWebsocket()
+// {
+//   webSocket.loop();
+//   unsigned long now = millis();
+//   if (now - lastSentInterval > interval && webSocket.isConnected())
+//   {
+//     lastSentInterval = now;
+//     int sensorValue = analogRead(LDR2);
 
-    // Optional: use JSON format
-    StaticJsonDocument<100> doc;
-    doc["sensor"] = sensorValue;
-    doc["msg"] = sensorValue;
-    doc["to"] = "city_2";
-    String json;
-    serializeJson(doc, json);
-    webSocket.sendTXT(json); // send sensor reading
-  }
-}
+//     // Optional: use JSON format
+//     StaticJsonDocument<100> doc;
+//     doc["sensor"] = sensorValue;
+//     doc["msg"] = sensorValue;
+//     doc["to"] = "city_2";
+//     String json;
+//     serializeJson(doc, json);
+//     webSocket.sendTXT(json); // send sensor reading
+//   }
+// }
 
 void setup()
 {
   Serial.begin(115200);
-  pinMode(SENSOR_PIN, INPUT);
+  pinMode(LDR1, INPUT);
+  pinMode(LDR2, INPUT);
+  pinMode(CO2_SENSOR_PIN, INPUT);
+
+  pinMode(CNY1, INPUT);
+  pinMode(CNY2, INPUT);
+  pinMode(CNY3, INPUT);
+  pinMode(CNY4, INPUT);
+  pinMode(CNY5, INPUT);
+  pinMode(CNY6, INPUT);
+
+  pinMode(B1, INPUT_PULLUP);
+  pinMode(B2, INPUT_PULLUP);
 
   pinMode(LR1, OUTPUT);
   pinMode(LY1, OUTPUT);
@@ -226,20 +276,20 @@ void setup()
   pinMode(LY2, OUTPUT);
   pinMode(LG2, OUTPUT);
 
-  // Wifi connection
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    Serial.print(".");
-    delay(1000);
-  }
-  Serial.println("\nConnected to WiFi");
+  // // Wifi connection
+  // WiFi.begin(ssid, password);
+  // Serial.print("Connecting to WiFi");
+  // while (WiFi.status() != WL_CONNECTED)
+  // {
+  //   Serial.print(".");
+  //   delay(1000);
+  // }
+  // Serial.println("\nConnected to WiFi");
 
-  // Setup secure WebSocket client (wss)
-  webSocket.beginSSL("ws.davinsony.com", 443, "/city_capibaras");
-  webSocket.onEvent(webSocketEvent);
-  webSocket.setReconnectInterval(5000);
+  // // Setup secure WebSocket client (wss)
+  // webSocket.beginSSL("ws.davinsony.com", 443, "/city_capibaras");
+  // webSocket.onEvent(webSocketEvent);
+  // webSocket.setReconnectInterval(5000);
 
   // Initialize the display
   config_display();
@@ -247,9 +297,53 @@ void setup()
   act();
 }
 
+void printSensors()
+{
+  lcd.setCursor(0, 0);
+  lcd.print("S1:");
+  lcd.setCursor(0, 1);
+  lcd.print(analogRead(LDR1));
+  lcd.setCursor(0, 2);
+  lcd.print(lowLightR1);
+
+  lcd.setCursor(5, 0);
+  lcd.print("S2:");
+  lcd.setCursor(5, 1);
+  lcd.print(analogRead(LDR2));
+  lcd.setCursor(5, 2);
+  lcd.print(lowLightR2);
+
+  lcd.setCursor(10, 0);
+  lcd.print("Co2:");
+  lcd.setCursor(10, 1);
+  lcd.print(analogRead(CO2_SENSOR_PIN));
+  lcd.setCursor(10, 2);
+  lcd.print(highCO2);
+
+  lcd.setCursor(15, 0);
+  lcd.print("B1");
+  lcd.setCursor(15, 1);
+  lcd.print(button1);
+
+  lcd.setCursor(15, 2);
+  lcd.print("C1");
+  lcd.setCursor(15, 3);
+  lcd.print(VC1);
+
+  lcd.setCursor(18, 0);
+  lcd.print("B2");
+  lcd.setCursor(18, 1);
+  lcd.print(button2);
+
+  lcd.setCursor(18, 2);
+  lcd.print("C2");
+  lcd.setCursor(18, 3);
+  lcd.print(VC2);
+}
+
 void loop()
 {
-  sendSignalWebsocket();
+  // sendSignalWebsocket();
   measure();
   control();
   act();
