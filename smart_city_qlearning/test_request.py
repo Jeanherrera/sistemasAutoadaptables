@@ -1,10 +1,19 @@
 import requests
 
+# action = 0 → prioridad carril 1
+# action = 1 → prioridad carril 2
+# action = 2 → modo sin vehículos
+# action = 3 → cruce peatonal
+
 data = {
-    "co2": 700,
-    "vis": 700,
-    "veh_c1": 3,
-    "veh_c2": 1
+    "veh_c1": 1,
+    "veh_c2": 3,
+    "co2": 600,                # Mayor a 700 → co2High = 1
+    "vlS1": 700,               # Menor a 600 → vlS1 = 1
+    "vlS2": 700,               # Menor a 600 → vlS2 = 1
+    "sensor_other_city": 1,    # 1 o 0
+    "currentMode": 1,          # 0: Día, 1: Noche
+    "peatonalRequested": 1     # 1 si botón fue oprimido
 }
 
 response = requests.post("http://localhost:5000/decidir", json=data)

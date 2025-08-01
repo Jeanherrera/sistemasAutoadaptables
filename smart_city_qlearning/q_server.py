@@ -4,27 +4,49 @@ import numpy as np
 
 app = Flask(__name__)
 
-# Cargar tabla entrenada
+# Cargar la tabla entrenada
 with open('q_table.pkl', 'rb') as f:
     q_table = pickle.load(f)
 
+def calculate_state(veh_c1, veh_c2, co2, vlS1, vlS2, other_city, mode, peatonal):
+    """Convierte los 8 valores a un entero entre 0 y 255"""
+    return (
+        (veh_c1 << 7) |
+        (veh_c2 << 6) |
+        (co2 << 5) |
+        (vlS1 << 4) |
+        (vlS2 << 3) |
+        (other_city << 2) |
+        (mode << 1) |
+        (peatonal)
+    )
+
 @app.route('/')
 def index():
-    return 'Servidor de la Smart City funcionando correctamente.'
+    return 'Servidor de Smart City Capibaras funcionando correctamente.'
 
 @app.route('/decidir', methods=['POST'])
 def decidir():
     data = request.get_json()
-    co2 = 1 if data['co2'] > 700 else 0
-    vis = 1 if data['vis'] < 600 else 0
-    veh_c1 = data['veh_c1']
-    veh_c2 = data['veh_c2']
-    veh = 1 if veh_c2 > veh_c1 else 0
 
-    state = co2 * 4 + vis * 2 + veh
+    # Convertir a 1 o 0 para que coincida con los datos entrenados
+    veh_c1 = 1 if data.get('veh_c1', 0) > 0 else 0
+    veh_c2 = 1 if data.get('veh_c2', 0) > 0 else 0
+    co2 = 1 if data.get('co2', 0) > 700 else 0
+    vlS1 = 1 if data.get('vlS1', 1000) < 600 else 0
+    vlS2 = 1 if data.get('vlS2', 1000) < 600 else 0
+    other_city = int(data.get('sensor_other_city', 0))
+    mode = int(data.get('currentMode', 0))  # 0: día, 1: noche
+    peatonal = int(data.get('peatonalRequested', 0))
+
+    state = calculate_state(veh_c1, veh_c2, co2, vlS1, vlS2, other_city, mode, peatonal)
+
+    if state >= len(q_table):
+        return jsonify({"error": "Estado fuera de la tabla Q", "state": state}), 400
+
     action = int(np.argmax(q_table[state]))
-
     return jsonify({"action": action})
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=5000)
