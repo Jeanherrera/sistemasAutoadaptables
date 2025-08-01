@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <WebSocketsClient_Generic.h>
 #include <ArduinoJson.h>
+#include <LiquidCrystal_I2C.h>
 
 // Pinout
 #define LR1 5
@@ -15,6 +16,9 @@
 
 const char *ssid = "AirportAgent01";
 const char *password = "15427605";
+
+// LCD I2C
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // Initial Value of External sensor
 int externalSensor = -1;
@@ -35,6 +39,14 @@ int state = 0;
 
 long unsigned tini, tactual, tdelta;
 bool badVisibility;
+
+void config_display()
+{
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("Smart City Capibaras");
+}
 
 void measure()
 {
@@ -220,6 +232,9 @@ void setup()
   webSocket.beginSSL("ws.davinsony.com", 443, "/city_capibaras");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(5000);
+
+  // Initialize the display
+  config_display();
 
   act();
 }
