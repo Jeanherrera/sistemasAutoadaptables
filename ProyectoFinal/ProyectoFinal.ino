@@ -49,7 +49,8 @@ int YELLOW_LED_PIN_2_STATE = LOW;
 
 const char *ssid = "Usuario";
 const char *password = "Clave";
-const char *serverUrl = "http://localhost:5000/decidir"; // IP local del servidor
+const char *serverUrl = "http://localhost:5000/decidir";  // IP local del servidor
+const char *serverUrlMode = "http://localhost:5000/modo"; // IP local del servidor para el modo
 
 WebSocketsClient webSocket;
 
@@ -76,6 +77,9 @@ const unsigned long debounceDelay = 50;
 
 unsigned long lastRequestTime = 0;
 const unsigned long requestInterval = 5000; // cada 5 segundos
+
+unsigned long lastRequestTimeGetMode = 0;
+const unsigned long requestIntervalGetModel = 5000; // cada 5 segundos
 
 enum Mode
 {
@@ -198,7 +202,9 @@ void loop()
 
   // Mostras los valores de los sensores
   show_values_display();
-  //checkModeSwitch();
+
+  checkModeSwitch(); // Verificar si se ha cambiado el modo
+
   integrationQlearning(); // Enviar datos al servidor y recibir acciones
 }
 
@@ -212,7 +218,7 @@ void integrationQlearning()
     lastRequestTime = currentMillis;
 
     // Lectura de sensores simulada (ajusta con tus pines reales)
-    int co2 =  co2High ? 1 : 0;
+    int co2 = co2High ? 1 : 0;
     int vlS1 = vlS1 ? 1 : 0;
     int vlS2 = vlS2 ? 1 : 0;
     int sensor_other_city = read_sensor_other_city() ? 1 : 0;
@@ -291,23 +297,52 @@ void actions(int action)
 
 void checkModeSwitch()
 {
-  int reading = digitalRead(BTN_MODE);
-  if (reading != lastModeBtnState)
-  {
-    lastDebounceTime = millis();
-  }
+  unsigned long currentMillis = millis();
 
-  if ((millis() - lastDebounceTime) > debounceDelay)
+  // Solo enviar al servidor cada X tiempo
+  if (currentMillis - lastRequestTimeGetMode >= requestIntervalGetModel)
   {
-    if (reading == LOW)
+    lastRequestTimeGetMode = currentMillis;
+
+    // Lectura de sensores simulada (ajusta con tus pines reales)
+    int co2 = co2High ? 1 : 0;
+    int vlS1 = vlS1 ? 1 : 0;
+    int vlS2 = vlS2 ? 1 : 0;
+    int sensor_other_city = read_sensor_other_city() ? 1 : 0;
+    int currentMode = 1; // Día/Noche
+
+    if (WiFi.status() == WL_CONNECTED)
     {
-      currentMode = (currentMode == MODE_DAY) ? MODE_NIGHT : MODE_DAY;
-      Serial.print("Cambiado a modo: ");
-      Serial.println(currentMode == MODE_DAY ? "DIA" : "NOCHE");
+      HTTPClient http;
+      http.begin(serverUrl);
+      int httpCode = http.GET();
+
+      if (httpCode == 200)
+      {
+        String payload = http.getString();
+        Serial.println("Respuesta del servidor: " + payload);
+
+        if (payload.indexOf("\"modo\":1") >= 0)
+        {
+          currentMode = MODE_NIGHT;
+        }
+        else
+        {
+          currentMode = MODE_DAY;
+        }
+
+        Serial.print("Modo actual: ");
+        Serial.println(currentMode == 1 ? "Noche" : "Día");
+      }
+      else
+      {
+        Serial.print("Error en POST: ");
+        Serial.println(httpCode);
+      }
+
+      http.end();
     }
   }
-
-  lastModeBtnState = reading;
 }
 
 void priorityLine1()

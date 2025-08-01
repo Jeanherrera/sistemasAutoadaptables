@@ -16,5 +16,8 @@ data = {
     "peatonalRequested": 1     # 1 si botón fue oprimido
 }
 
-response = requests.post("http://localhost:5000/decidir", json=data)
+# response = requests.post("http://localhost:5000/decidir", json=data)
+# print(response.json())
+
+response = requests.get("http://localhost:5000/modo", json=data)
 print(response.json())
