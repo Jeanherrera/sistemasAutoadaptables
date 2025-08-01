@@ -94,6 +94,12 @@ void setTrafficLight2(bool r2, bool y2, bool g2)
   G2 = g2;
 }
 
+void setState(int newState)
+{
+  state = newState;
+  tini = millis();
+}
+
 void control()
 {
   switch (state)
@@ -103,15 +109,9 @@ void control()
     setTrafficLight1(0, 0, 1);
     setTrafficLight2(1, 0, 0);
     if (lowLightR2)
-    {
-      state = 2;
-      tini = millis();
-    }
+      setState(2);
     else if (tdelta >= 1000)
-    {
-      state = 1;
-      tini = millis();
-    }
+      setState(1);
     break;
 
   // YELLOW
@@ -119,15 +119,9 @@ void control()
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
     if (lowLightR2)
-    {
-      state = 2;
-      tini = millis();
-    }
+      setState(2);
     else if (tdelta >= 500)
-    {
-      state = 2;
-      tini = millis();
-    }
+      setState(2);
     break;
 
   // GREEN
@@ -135,14 +129,9 @@ void control()
     setTrafficLight1(1, 0, 0);
     setTrafficLight2(0, 0, 1);
     if (lowLightR2)
-    {
       tini = millis();
-    }
     else if (tdelta >= 1000 && !lowLightR2)
-    {
-      state = 3;
-      tini = millis();
-    }
+      setState(3);
     break;
 
   // YELLOW
@@ -150,15 +139,9 @@ void control()
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
     if (lowLightR2)
-    {
-      state = 2;
-      tini = millis();
-    }
+      setState(2);
     else if (tdelta >= 500)
-    {
-      state = 0;
-      tini = millis();
-    }
+      setState(0);
     break;
 
     // YELLOW FLASHING
