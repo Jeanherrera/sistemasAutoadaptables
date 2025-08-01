@@ -13,11 +13,11 @@ data = {
     "vlS2": 700,               # Menor a 600 → vlS2 = 1
     "sensor_other_city": 1,    # 1 o 0
     "currentMode": 1,          # 0: Día, 1: Noche
-    "peatonalRequested": 1     # 1 si botón fue oprimido
+    "peatonalRequested": 0     # 1 si botón fue oprimido
 }
 
-# response = requests.post("http://localhost:5000/decidir", json=data)
-# print(response.json())
-
-response = requests.get("http://localhost:5000/modo", json=data)
+response = requests.post("http://localhost:5000/decidir", json=data)
 print(response.json())
+
+#response = requests.post("http://localhost:5000/decidir", json=data)
+#print(response.json())

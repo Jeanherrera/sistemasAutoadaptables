@@ -304,17 +304,10 @@ void checkModeSwitch()
   {
     lastRequestTimeGetMode = currentMillis;
 
-    // Lectura de sensores simulada (ajusta con tus pines reales)
-    int co2 = co2High ? 1 : 0;
-    int vlS1 = vlS1 ? 1 : 0;
-    int vlS2 = vlS2 ? 1 : 0;
-    int sensor_other_city = read_sensor_other_city() ? 1 : 0;
-    int currentMode = 1; // Día/Noche
-
     if (WiFi.status() == WL_CONNECTED)
     {
       HTTPClient http;
-      http.begin(serverUrl);
+      http.begin(serverUrlGetMode);
       int httpCode = http.GET();
 
       if (httpCode == 200)
