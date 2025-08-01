@@ -32,7 +32,7 @@ bool button1, button2;
 // Light Dependent Resistors (LDRs)
 #define LDR1 13
 #define LDR2 12
-#define UMBRAL_LDR 600
+#define UMBRAL_LDR 2000
 bool lowLightR1, lowLightR2;
 
 // CO₂ Sensor
@@ -100,6 +100,23 @@ void setState(int newState)
   tini = millis();
 }
 
+void setYellowFlashing()
+{
+  static unsigned long lcdLastTime = 0;
+
+  bool flashing = (millis() / 500) % 2; // Toggle every 500ms
+  if (flashing)
+  {
+    setTrafficLight1(0, 1, 0);
+    setTrafficLight2(0, 1, 0);
+  }
+  else
+  {
+    setTrafficLight1(0, 0, 0);
+    setTrafficLight2(0, 0, 0);
+  }
+}
+
 void control()
 {
   switch (state)
@@ -144,21 +161,15 @@ void control()
       setState(0);
     break;
 
-    // YELLOW FLASHING
-    // case 4:
-    //   setTrafficLight1(0, 1, 0);
-    //   setTrafficLight2(0, 1, 0);
-    //   if (lowLightR2)
-    //   {
-    //     state = 2;
-    //     tini = millis();
-    //   }
-    //   else if (tdelta >= 1000)
-    //   {
-    //     state = 0;
-    //     tini = millis();
-    //   }
-    //   break;
+  // YELLOW FLASHING
+  case 4:
+    setYellowFlashing();
+    if (!lowLightR2 && !lowLightR1)
+    {
+      state = 0;
+      tini = millis();
+    }
+    break;
 
   default:
     break;
