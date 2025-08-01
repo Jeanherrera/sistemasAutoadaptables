@@ -102,7 +102,7 @@ void control()
   case 0:
     setTrafficLight1(0, 0, 1);
     setTrafficLight2(1, 0, 0);
-    if (lowLightR1)
+    if (lowLightR2)
     {
       state = 2;
       tini = millis();
@@ -118,7 +118,7 @@ void control()
   case 1:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (lowLightR1)
+    if (lowLightR2)
     {
       state = 2;
       tini = millis();
@@ -134,11 +134,11 @@ void control()
   case 2:
     setTrafficLight1(1, 0, 0);
     setTrafficLight2(0, 0, 1);
-    if (lowLightR1)
+    if (lowLightR2)
     {
       tini = millis();
     }
-    else if (tdelta >= 1000 && !lowLightR1)
+    else if (tdelta >= 1000 && !lowLightR2)
     {
       state = 3;
       tini = millis();
@@ -149,7 +149,7 @@ void control()
   case 3:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (lowLightR1)
+    if (lowLightR2)
     {
       state = 2;
       tini = millis();
@@ -165,7 +165,7 @@ void control()
     // case 4:
     //   setTrafficLight1(0, 1, 0);
     //   setTrafficLight2(0, 1, 0);
-    //   if (lowLightR1)
+    //   if (lowLightR2)
     //   {
     //     state = 2;
     //     tini = millis();
