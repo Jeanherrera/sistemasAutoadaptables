@@ -61,28 +61,17 @@ int state = 0;
 
 long unsigned tini, tactual, tdelta;
 
-void config_display()
-{
-  lcd.init();
-  lcd.backlight();
-}
-
 void measure()
 {
   lowLightR1 = analogRead(LDR1) < UMBRAL_LDR;
   lowLightR2 = analogRead(LDR2) < UMBRAL_LDR;
-
   highCO2 = analogRead(CO2_SENSOR_PIN) > UMBRAL_CO2;
-
   button1 = digitalRead(B1);
   button2 = digitalRead(B2);
-
   VC1 = !digitalRead(CNY1) + !digitalRead(CNY2) + !digitalRead(CNY3);
   VC2 = !digitalRead(CNY4) + !digitalRead(CNY5) + !digitalRead(CNY6);
-
   tactual = millis();
   tdelta = tactual - tini;
-
   printSensors();
 }
 
@@ -276,6 +265,9 @@ void setup()
   pinMode(LY2, OUTPUT);
   pinMode(LG2, OUTPUT);
 
+  lcd.init();
+  lcd.backlight();
+
   // // Wifi connection
   // WiFi.begin(ssid, password);
   // Serial.print("Connecting to WiFi");
@@ -292,8 +284,6 @@ void setup()
   // webSocket.setReconnectInterval(5000);
 
   // Initialize the display
-  config_display();
-
   act();
 }
 
