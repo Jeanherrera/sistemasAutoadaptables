@@ -2,6 +2,7 @@
 #include <WebSocketsClient_Generic.h>
 #include <ArduinoJson.h>
 #include <LiquidCrystal_I2C.h>
+#include <math.h> //Mathematics library for pow function (CO2 computation)
 
 // Pinout
 #define LR1 5
@@ -38,6 +39,7 @@ bool lowLightR1, lowLightR2;
 #define CO2_SENSOR_PIN 14
 #define UMBRAL_CO2 1000
 bool highCO2;
+int CO2ppm = 0;
 
 const char *ssid = "AirportAgent01";
 const char *password = "15427605";
@@ -65,7 +67,10 @@ void measure()
 {
   lowLightR1 = analogRead(LDR1) < UMBRAL_LDR;
   lowLightR2 = analogRead(LDR2) < UMBRAL_LDR;
-  highCO2 = analogRead(CO2_SENSOR_PIN) > UMBRAL_CO2;
+
+  CO2ppm = analogRead(CO2_SENSOR_PIN);
+  highCO2 = CO2ppm > UMBRAL_CO2;
+
   button1 = digitalRead(B1);
   button2 = digitalRead(B2);
   VC1 = !digitalRead(CNY1) + !digitalRead(CNY2) + !digitalRead(CNY3);
@@ -289,45 +294,41 @@ void setup()
 
 void printSensors()
 {
+  static unsigned long lcdLastTime = 0;
+  if (millis() - lcdLastTime < 250)
+    return;
+
+  lcdLastTime = millis();
+
+  int s1 = analogRead(LDR1);
+  int s2 = analogRead(LDR2);
+
   lcd.setCursor(0, 0);
   lcd.print("S1:");
+  lcd.print(s1);
+  lcd.print(" L:");
+  lcd.print(lowLightR1 ? "Y" : "N");
+
   lcd.setCursor(0, 1);
-  lcd.print(analogRead(LDR1));
-  lcd.setCursor(0, 2);
-  lcd.print(lowLightR1);
-
-  lcd.setCursor(5, 0);
   lcd.print("S2:");
-  lcd.setCursor(5, 1);
-  lcd.print(analogRead(LDR2));
-  lcd.setCursor(5, 2);
-  lcd.print(lowLightR2);
+  lcd.print(s2);
+  lcd.print(" L:");
+  lcd.print(lowLightR2 ? "Y" : "N");
 
-  lcd.setCursor(10, 0);
-  lcd.print("Co2:");
-  lcd.setCursor(10, 1);
-  lcd.print(analogRead(CO2_SENSOR_PIN));
-  lcd.setCursor(10, 2);
-  lcd.print(highCO2);
+  lcd.setCursor(0, 2);
+  lcd.print("CO2:");
+  lcd.print(CO2ppm);
+  lcd.print(" H:");
+  lcd.print(highCO2 ? "Y" : "N");
 
-  lcd.setCursor(15, 0);
-  lcd.print("B1");
-  lcd.setCursor(15, 1);
+  lcd.setCursor(0, 3);
+  lcd.print("B1:");
   lcd.print(button1);
-
-  lcd.setCursor(15, 2);
-  lcd.print("C1");
-  lcd.setCursor(15, 3);
+  lcd.print(" C1:");
   lcd.print(VC1);
-
-  lcd.setCursor(18, 0);
-  lcd.print("B2");
-  lcd.setCursor(18, 1);
+  lcd.print(" B2:");
   lcd.print(button2);
-
-  lcd.setCursor(18, 2);
-  lcd.print("C2");
-  lcd.setCursor(18, 3);
+  lcd.print(" C2:");
   lcd.print(VC2);
 }
 
