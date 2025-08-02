@@ -28,7 +28,7 @@ def decidir():
     # Convertir a 1 o 0 para que coincida con los datos entrenados
     veh_c1 = 1 if data.get('veh_c1', 0) > 0 else 0
     veh_c2 = 1 if data.get('veh_c2', 0) > 0 else 0
-    co2 = 1 if data.get('co2', 0) > 700 else 0
+    co2 = 1 if data.get('co2', 0) > 2000 else 0
     vlS1 = 1 if data.get('vlS1', 1000) < 600 else 0
     vlS2 = 1 if data.get('vlS2', 1000) < 600 else 0
     other_city = int(data.get('sensor_other_city', 0))

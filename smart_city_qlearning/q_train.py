@@ -6,11 +6,10 @@ n_actions = 4  # 0: Línea 1, 1: Línea 2, 2: No Vehículos, 3: Cruce Peatonal
 
 q_table = np.zeros((n_states, n_actions))
 
-episodes = 5000
+episodes = 15000
 alpha = 0.1
 gamma = 0.9
 epsilon = 0.2
-
 
 def calculate_state(veh_c1, veh_c2, co2, vlS1, vlS2, other_city, mode, peatonal):
     return (
@@ -24,11 +23,10 @@ def calculate_state(veh_c1, veh_c2, co2, vlS1, vlS2, other_city, mode, peatonal)
         | (peatonal)
     )
 
-
 for episode in range(episodes):
     # Simulación de entradas binarias aleatorias
-    veh_c1 = np.random.choice([0, 1])
-    veh_c2 = np.random.choice([0, 1, 2])  # puede haber más vehículos
+    veh_c1 = np.random.choice([0, 1, 2])  # 0, 1, 2 vehículos
+    veh_c2 = np.random.choice([0, 1, 2])
     co2 = np.random.choice([0, 1])
     vlS1 = np.random.choice([0, 1])
     vlS2 = np.random.choice([0, 1])
@@ -57,9 +55,19 @@ for episode in range(episodes):
             reward = 10 if action == 2 else -3
         elif veh_c1 > 0 and veh_c2 > 0:
             if veh_c1 > veh_c2:
-                reward = 10 if action == 0 else -3
+                if action == 0:
+                    reward = 10
+                elif action == 1:
+                    reward = -10  # Penalización más fuerte
+                else:
+                    reward = -5
             else:
-                reward = 10 if action == 1 else -3
+                if action == 1:
+                    reward = 10
+                elif action == 0:
+                    reward = -10
+                else:
+                    reward = -5
         elif veh_c1 > 0:
             reward = 10 if action == 0 else -3
         elif veh_c2 > 0:
@@ -82,4 +90,5 @@ for episode in range(episodes):
 with open("q_table.pkl", "wb") as f:
     pickle.dump(q_table, f)
 
-print("Entrenamiento finalizado con reglas actualizadas.")
+print("Entrenamiento finalizado con reglas ajustadas.")
+ 

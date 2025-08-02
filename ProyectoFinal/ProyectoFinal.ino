@@ -34,8 +34,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #define CO2_SENSOR_PIN 14 // CO₂
 
 // Botones semaforos
-#define BTN_PEATONAL 1 // Traffic light 1 button connected in pin 1
-#define BTN_MODE 2     // Traffic light 2 button connected in pin 2
+#define BTN_PEATONAL_S1 1 // Traffic light 1 button connected in pin 1
+#define BTN_PEATONAL_S2 2 // Traffic light 2 button connected in pin 2
 
 // Estados del semáforo
 #define RED 0
@@ -50,13 +50,13 @@ int YELLOW_LED_PIN_2_STATE = LOW;
 
 const char *ssid = "iPhone de Jean";
 const char *password = "12345679";
-const char *serverUrl = "http://localhost:5000/decidir";  // IP local del servidor
-const char *serverUrlMode = "http://localhost:5000/modo"; // IP local del servidor para el modo
+const char *serverUrl = "http://172.20.10.6:5000/decidir";  // IP local del servidor
+const char *serverUrlMode = "http://172.20.10.6:5000/modo"; // IP local del servidor para el modo
 
 WebSocketsClient webSocket;
 
 unsigned long previousMillis = 0;
-const unsigned long interval = 100;
+const unsigned long interval = 1000;
 
 int state = 0;
 bool vlS1 = false, vlS2 = false;
@@ -77,10 +77,10 @@ unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50;
 
 unsigned long lastRequestTime = 0;
-const unsigned long requestInterval = 5000; // cada 5 segundos
+const unsigned long requestInterval = 1000; // cada 5 segundos
 
 unsigned long lastRequestTimeGetMode = 0;
-const unsigned long requestIntervalGetModel = 5000; // cada 5 segundos
+const unsigned long requestIntervalGetModel = 1000; // cada 5 segundos
 
 enum Mode
 {
@@ -129,10 +129,9 @@ void pinModes()
   pinMode(GREEN_LED_PIN_2, OUTPUT);
 
   // Pasos peatonales
-  pinMode(BTN_PEATONAL, INPUT_PULLUP);
-
-  // Modo
-  pinMode(BTN_MODE, INPUT_PULLUP);
+  pinMode(BTN_PEATONAL_S1, INPUT_PULLUP);
+  pinMode(BTN_PEATONAL_S2, INPUT_PULLUP);
+  ;
 }
 
 void config_display()
@@ -147,7 +146,7 @@ void config_display()
 void read_CO2_sensor()
 {
   sensorValueCO2 = analogRead(CO2_SENSOR_PIN);
-  co2High = (sensorValueCO2 > 700);
+  co2High = (sensorValueCO2 > 2000);
 }
 
 void read_sensor_S1()
@@ -219,11 +218,7 @@ void integrationQlearning()
     lastRequestTime = currentMillis;
 
     // Lectura de sensores simulada (ajusta con tus pines reales)
-    int co2 = co2High ? 1 : 0;
-    int vlS1 = vlS1 ? 1 : 0;
-    int vlS2 = vlS2 ? 1 : 0;
     int sensor_other_city = read_sensor_other_city() ? 1 : 0;
-    int currentMode = 1; // Día/Noche
 
     if (WiFi.status() == WL_CONNECTED)
     {
@@ -233,9 +228,9 @@ void integrationQlearning()
 
       String payload = "{\"veh_c1\":" + String(veh_c1) +
                        ",\"veh_c2\":" + String(veh_c2) +
-                       ",\"co2\":" + String(co2) +
-                       ",\"vlS1\":" + String(vlS1) +
-                       ",\"vlS2\":" + String(vlS2) +
+                       ",\"co2\":" + String(sensorValueCO2) +
+                       ",\"vlS1\":" + String(sensorValueS1) +
+                       ",\"vlS2\":" + String(sensorValueS2) +
                        ",\"sensor_other_city\":" + String(sensor_other_city) +
                        ",\"currentMode\":" + String(currentMode) +
                        ",\"peatonalRequested\":" + String(peatonalRequested) + "}";
@@ -245,6 +240,8 @@ void integrationQlearning()
       if (httpCode > 0)
       {
         String response = http.getString();
+
+        Serial.println("Payload: " + payload);
         Serial.println("Respuesta del servidor: " + response);
 
         // Parsear acción recibida (ej: {"action": 1})
@@ -464,8 +461,8 @@ void updateLights()
     R1 = 0;
     Y1 = 1;
     V1 = 0;
-    R2 = 0;
-    Y2 = 1;
+    R2 = 1;
+    Y2 = 0;
     V2 = 0;
     break;
 
@@ -479,8 +476,8 @@ void updateLights()
     break;
 
   case GREEN_TO_YELLOW:
-    R1 = 0;
-    Y1 = 1;
+    R1 = 1;
+    Y1 = 0;
     V1 = 0;
     R2 = 0;
     Y2 = 1;
@@ -528,26 +525,26 @@ void updateLights()
   digitalWrite(GREEN_LED_PIN_2, V2);
 }
 
-void read_lane_in_1()
-{
-  veh_c1 = 0;
-  if (digitalRead(CNY4) == LOW)
-    veh_c1++;
-  if (digitalRead(CNY5) == LOW)
-    veh_c1++;
-  if (digitalRead(CNY6) == LOW)
-    veh_c1++;
-}
-
 void read_lane_in_2()
 {
   veh_c2 = 0;
+  if (digitalRead(CNY4) == LOW)
+    veh_c2++;
+  if (digitalRead(CNY5) == LOW)
+    veh_c2++;
+  if (digitalRead(CNY6) == LOW)
+    veh_c2++;
+}
+
+void read_lane_in_1()
+{
+  veh_c1 = 0;
   if (digitalRead(CNY1) == LOW)
-    veh_c2++;
+    veh_c1++;
   if (digitalRead(CNY2) == LOW)
-    veh_c2++;
+    veh_c1++;
   if (digitalRead(CNY3) == LOW)
-    veh_c2++;
+    veh_c1++;
 }
 
 void request_pedestrian_crossing()
@@ -573,7 +570,7 @@ void request_pedestrian_crossing()
 
 void pedestrian_crossing()
 {
-  if ((digitalRead(BTN_PEATONAL) == LOW) && !peatonalRequested)
+  if ((digitalRead(BTN_PEATONAL_S1) == HIGH || digitalRead(BTN_PEATONAL_S2) == HIGH) && !peatonalRequested)
   {
     peatonalRequested = true;
     peatonalRequestTime = millis(); // Marca el momento de la solicitud

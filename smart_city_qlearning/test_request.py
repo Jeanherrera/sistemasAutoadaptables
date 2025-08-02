@@ -6,12 +6,12 @@ import requests
 # action = 3 → cruce peatonal
 
 data = {
-    "veh_c1": 1,
+    "veh_c1": 2,
     "veh_c2": 3,
-    "co2": 600,                # Mayor a 700 → co2High = 1
+    "co2": 1000,                # Mayor a 700 → co2High = 1
     "vlS1": 700,               # Menor a 600 → vlS1 = 1
     "vlS2": 700,               # Menor a 600 → vlS2 = 1
-    "sensor_other_city": 1,    # 1 o 0
+    "sensor_other_city": 0,    # 1 o 0
     "currentMode": 1,          # 0: Día, 1: Noche
     "peatonalRequested": 0     # 1 si botón fue oprimido
 }
