@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WebSocketsClient_Generic.h>
 #include <ArduinoJson.h>
+#include <HTTPClient.h>
 
 // LCD I2C
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -47,8 +48,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 int YELLOW_LED_PIN_1_STATE = LOW;
 int YELLOW_LED_PIN_2_STATE = LOW;
 
-const char *ssid = "Usuario";
-const char *password = "Clave";
+const char *ssid = "iPhone de Jean";
+const char *password = "12345679";
 const char *serverUrl = "http://localhost:5000/decidir";  // IP local del servidor
 const char *serverUrlMode = "http://localhost:5000/modo"; // IP local del servidor para el modo
 
@@ -307,7 +308,7 @@ void checkModeSwitch()
     if (WiFi.status() == WL_CONNECTED)
     {
       HTTPClient http;
-      http.begin(serverUrlGetMode);
+      http.begin(serverUrlMode);
       int httpCode = http.GET();
 
       if (httpCode == 200)
