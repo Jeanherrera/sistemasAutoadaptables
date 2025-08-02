@@ -125,7 +125,7 @@ void control()
   case 0:
     setTrafficLight1(0, 0, 1);
     setTrafficLight2(1, 0, 0);
-    if (lowLightR1 && lowLightR2) 
+    if (lowLightR1 && lowLightR2)
       setState(4);
     else if (lowLightR2)
       setState(2);
@@ -137,7 +137,7 @@ void control()
   case 1:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (lowLightR1 && lowLightR2) 
+    if (lowLightR1 && lowLightR2)
       setState(4);
     else if (lowLightR2)
       setState(2);
@@ -149,7 +149,7 @@ void control()
   case 2:
     setTrafficLight1(1, 0, 0);
     setTrafficLight2(0, 0, 1);
-    if (lowLightR1 && lowLightR2) 
+    if (lowLightR1 && lowLightR2)
       setState(4);
     else if (lowLightR2)
       tini = millis();
@@ -161,7 +161,7 @@ void control()
   case 3:
     setTrafficLight1(0, 1, 0);
     setTrafficLight2(0, 1, 0);
-    if (lowLightR1 && lowLightR2) 
+    if (lowLightR1 && lowLightR2)
       setState(4);
     else if (lowLightR2)
       setState(2);
@@ -173,12 +173,22 @@ void control()
   case 4:
     setYellowFlashing();
     if (!lowLightR2 && !lowLightR1)
-    {
-      state = 0;
-      tini = millis();
-    }
+      setState(0);
+    // else if (B2)
+    //   setState(0);
+    // else if (B1)
+    //   setState(2);
     break;
 
+    // RED NIGHT
+  // case 5:
+  //   setTrafficLight1(0, 0, 1);
+  //   setTrafficLight2(1, 0, 0);
+  //   if (tdelta >= 1000)
+  //     setState(6);
+  //   break;
+
+  
   default:
     break;
   }
@@ -309,19 +319,19 @@ void printSensors()
   lcd.print("S1:");
   lcd.print(s1);
   lcd.print(" L:");
-  lcd.print(lowLightR1 ? "Y" : "N");
+  lcd.print(lowLightR1 ? "Y    " : "N    ");
 
   lcd.setCursor(0, 1);
   lcd.print("S2:");
   lcd.print(s2);
   lcd.print(" L:");
-  lcd.print(lowLightR2 ? "Y" : "N");
+  lcd.print(lowLightR2 ? "Y    " : "N    ");
 
   lcd.setCursor(0, 2);
   lcd.print("CO2:");
   lcd.print(CO2ppm);
   lcd.print(" H:");
-  lcd.print(highCO2 ? "Y" : "N");
+  lcd.print(highCO2 ? "Y    " : "N    ");
 
   lcd.setCursor(0, 3);
   lcd.print("B1:");
